@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Arena: Mega Expansión Pro</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-main: #0b0f19;
+            --bg-card-back: #1e293b;
+            --bg-card-front: #3b82f6;
+            --text-light: #f8fafc;
+            --accent-gold: #fbbf24;
+            --player1-color: #3b82f6;
+            --player2-color: #ec4899;
+            --profile-bg: #131b2e;
+            --avatar-border-glow: none;
+            --card-back-image: none;
+            --card-custom-border: 2px solid #334155;
+            --card-front-custom-border: 2px solid #60a5fa;
+            --card-front-effect: none;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
+        body { background-color: var(--bg-main); background-image: var(--body-bg-custom, none); background-size: cover; background-position: center; background-attachment: fixed; color: var(--text-light); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow-x: hidden; position: relative; }
+
+        .top-bar { position: absolute; top: 20px; right: 20px; left: 20px; display: flex; justify-content: space-between; align-items: center; z-index: 100; pointer-events: none; }
+        .user-profile-hud, .hud-pill { pointer-events: auto; }
+        .user-profile-hud { display: flex; align-items: center; gap: 10px; background: rgba(30, 41, 59, 0.8); padding: 5px 15px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
+        .hud-avatar-wrapper { position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; }
+        .hud-avatar { font-size: 1.5rem; background: #334155; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 50%; box-shadow: var(--avatar-border-glow); }
+        .hud-info-block { display: flex; flex-direction: column; }
+        .hud-username { font-weight: bold; font-size: 0.95rem; line-height: 1.1; }
+        .hud-usertitle { font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .hud-pill { background: rgba(30, 41, 59, 0.8); padding: 10px 20px; border-radius: 50px; font-weight: bold; border: 1px solid var(--accent-gold); color: var(--accent-gold); }
+
+        .screen { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; max-width: 950px; padding: 20px; margin-top: 60px; animation: fadeIn 0.3s ease-out; z-index: 10; }
+        .screen.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+        h1 { font-size: 3rem; margin-bottom: 5px; text-align: center; background: linear-gradient(45deg, #60a5fa, #a855f7, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; }
+        p.subtitle { color: #94a3b8; margin-bottom: 25px; font-size: 1.1rem; text-align: center; }
+
+        .input-field { background: #1e293b; border: 2px solid #334155; color: white; padding: 12px; border-radius: 10px; font-size: 1rem; outline: none; text-align: center; width: 100%; margin-bottom: 10px; }
+        .btn { background-color: var(--primary); color: white; border: none; padding: 14px 28px; font-size: 1rem; font-weight: 600; border-radius: 12px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); text-align: center; width: 100%; }
+        .btn:hover:not(:disabled) { background-color: var(--primary-hover); transform: translateY(-2px); }
+        .btn:disabled { background-color: #475569; cursor: not-allowed; opacity: 0.7; box-shadow: none; transform: none; }
+
+        .mode-selector { display: flex; gap: 10px; margin-bottom: 20px; width: 100%; max-width: 600px; }
+        .mode-btn { flex: 1; background: #1e293b; border: 2px solid #334155; color: #94a3b8; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .mode-btn.selected { background: var(--primary); border-color: #818cf8; color: white; }
+
+        .code-box { background: #131b2e; padding: 20px; border-radius: 12px; border: 1px solid #1e293b; width: 100%; max-width: 600px; margin-bottom: 20px; text-align: center; }
+        .room-code-display { font-size: 2rem; font-weight: bold; color: var(--accent-gold); letter-spacing: 4px; margin: 10px 0; background: #0b0f19; padding: 10px; border-radius: 8px; border: 1px solid #1e293b; }
+
+        .difficulty-sections { width: 100%; max-width: 700px; background: #131b2e; padding: 20px; border-radius: 16px; border: 1px solid #1e293b; margin-bottom: 25px; }
+        
+        .levels-grid-scroll { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; max-height: 250px; overflow-y: auto; padding-right: 10px; }
+        .levels-grid-scroll::-webkit-scrollbar { width: 8px; }
+        .levels-grid-scroll::-webkit-scrollbar-track { background: #0b0f19; border-radius: 4px; }
+        .levels-grid-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        
+        .btn-level { background-color: #1e293b; border: 1px solid #334155; color: #cbd5e1; padding: 10px 4px; cursor: pointer; border-radius: 8px; font-size: 0.85rem; font-weight: bold; transition: all 0.2s; }
+        .btn-level:hover { background-color: var(--primary); border-color: #818cf8; color: white; transform: scale(1.05); }
+        .btn-level.selected-level { background-color: var(--accent-gold) !important; color: #0b0f19 !important; border-color: var(--accent-gold) !important; }
+
+        .shop-navigation { display: flex; gap: 8px; width: 100%; max-width: 850px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
+        .shop-nav-btn { background: #1e293b; border: 1px solid #334155; color: white; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: bold; white-space: nowrap; font-size: 0.9rem; }
+        .shop-nav-btn.active { background: var(--accent-gold); color: #0b0f19; border-color: var(--accent-gold); }
+        
+        .shop-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; max-width: 850px; height: 50vh; overflow-y: auto; padding-right: 5px; }
+        @media (max-width: 750px) { .shop-container { grid-template-columns: 1fr; } }
+        .shop-tab-content { display: none; width: 100%; grid-column: span 2; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        @media (max-width: 750px) { .shop-tab-content { grid-template-columns: 1fr; } }
+        .shop-tab-content.active { display: grid; }
+        
+        .shop-section { background: #131b2e; padding: 20px; border-radius: 16px; border: 1px solid #1e293b; height: fit-content; }
+        .shop-section h2 { font-size: 1.2rem; margin-bottom: 15px; color: var(--accent-gold); border-bottom: 1px solid #1e293b; padding-bottom: 5px; }
+        .shop-item { display: flex; justify-content: space-between; align-items: center; background: #0b0f19; padding: 12px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #1e293b; }
+        .shop-item-info { display: flex; flex-direction: column; }
+        .shop-item-desc { font-size: 0.75rem; color: #94a3b8; }
+
+        .scoreboard { display: flex; justify-content: space-around; width: 100%; max-width: 700px; margin-bottom: 15px; background: #131b2e; padding: 15px; border-radius: 16px; }
+        .player-score { text-align: center; padding: 5px 15px; border-radius: 8px; opacity: 0.5; width: 40%; transition: all 0.3s; border: 2px solid transparent; }
+        .player-score.active-turn { opacity: 1; background: rgba(255, 255, 255, 0.05); box-shadow: 0 0 10px rgba(255,255,255,0.1); border-color: white !important;}
+        
+        .game-layout { display: flex; gap: 20px; align-items: flex-start; justify-content: center; width: 100%; }
+        @media (max-width: 700px) { .game-layout { flex-direction: column; align-items: center; } .powerups-panel { flex-direction: row !important; width: 100%; justify-content: center; } }
+        
+        .game-board { display: grid; gap: 6px; background: rgba(30, 41, 59, 0.2); padding: 12px; border-radius: 16px; width: fit-content; margin: 0 auto; }
+        
+        .powerups-panel { display: flex; flex-direction: column; gap: 10px; background: #131b2e; padding: 15px; border-radius: 16px; border: 1px solid #1e293b; }
+        .powerup-btn { background: #1e293b; border: 1px solid #334155; color: white; padding: 10px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; font-size: 0.8rem; min-width: 80px; transition: all 0.2s; }
+        .powerup-btn:hover:not(:disabled) { background: #334155; border-color: var(--accent-gold); }
+        .powerup-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .powerup-count { font-weight: bold; color: var(--accent-gold); margin-top: 2px; }
+
+        .card { width: 55px; height: 75px; position: relative; transform-style: preserve-3d; transition: transform 0.4s ease; cursor: pointer; }
+        .game-board.large-board .card { width: 42px; height: 55px; font-size: 1.1rem; }
+        
+        .card.flipped, .card.matched { transform: rotateY(180deg) !important; }
+        .card.matched { pointer-events: none; opacity: 1 !important; }
+        
+        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; border-radius: 6px; }
+        
+        .card-back { background: var(--bg-card-back); background-image: var(--card-back-image); background-size: cover; background-position: center; border: var(--card-custom-border); }
+        .card-front { background: var(--bg-card-front); transform: rotateY(180deg); border: var(--card-front-custom-border); box-shadow: var(--card-front-effect); }
+        
+        .card.matched.by-p1 .card-front { background: #1e3a8a !important; border-color: var(--player1-color) !important; box-shadow: 0 0 10px rgba(59, 130, 246, 0.6); }
+        .card.matched.by-p2 .card-front { background: #831843 !important; border-color: var(--player2-color) !important; box-shadow: 0 0 10px rgba(236, 72, 153, 0.6); }
+
+        #network-status { font-size: 0.85rem; color: #a1a1aa; margin-top: 5px; font-style: italic; }
+
+        .text-glow-gold { text-shadow: 0 0 8px #fbbf24; color: #fff !important; font-weight: bold; }
+        .rainbow-text { background: linear-gradient(to right, #ef4444, #f59e0b, #10b981, #3b82f6, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold; animation: pulseGlow 2s infinite alternate; }
+        @keyframes pulseGlow { from { filter: drop-shadow(0 0 2px rgba(255,255,255,0.3)); } to { filter: drop-shadow(0 0 8px rgba(255,255,255,0.8)); } }
+        
+        .profile-customization-box { background: #131b2e; padding: 15px; border-radius: 12px; border: 1px solid #1e293b; width: 100%; max-width: 400px; margin-bottom: 15px; }
+        .custom-item-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; margin-bottom: 8px; }
+        .btn-select-custom { padding: 6px 12px; font-size: 0.85rem; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: white; cursor: pointer; }
+        .btn-select-custom.active { border-color: var(--accent-gold); background: rgba(251, 191, 36, 0.1); }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <div class="user-profile-hud" onclick="changeScreen('profile-screen')">
+            <div class="hud-avatar-wrapper">
+                <div class="hud-avatar" id="hud-avatar-icon">👤</div>
+            </div>
+            <div class="hud-info-block">
+                <div id="hud-username" class="hud-username">Usuario</div>
+                <div id="hud-usertitle" class="hud-usertitle">Novato</div>
+            </div>
+        </div>
+        <div class="hud-pill">🪙 <span id="global-coins-count">100</span></div>
+    </div>
+
+    <div id="menu-screen" class="screen active">
+        <h1>Memory Arena</h1>
+        <p class="subtitle">Modos locales, bots inteligentes o duelos estratégicos por código de sala</p>
+        
+        <h3 style="margin-bottom: 10px; color: #94a3b8;">1. Selecciona Modo de Juego:</h3>
+        <div class="mode-selector">
+            <button id="mode-solo" class="mode-btn selected" onclick="selectMode('solo')">Solo</button>
+            <button id="mode-bot" class="mode-btn" onclick="selectMode('bot')">Vs BOT 🤖</button>
+            <button id="mode-online" class="mode-btn" onclick="selectMode('online')">Online 🔑</button>
+        </div>
+
+        <div id="online-panel" style="display: none;" class="code-box">
+            <h4 style="color: var(--accent-gold); margin-bottom: 15px;">Conexión Multijugador Real</h4>
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px;">
+                <button class="btn" style="background: #10b981;" id="btn-crear-sala" onclick="createOnlineRoom()">Opción A: Crear Sala</button>
+                <div style="border-top: 1px solid #334155; padding-top: 15px;">
+                    <input type="number" id="join-code-input" class="input-field" placeholder="Código de 6 dígitos">
+                    <button class="btn" style="background: #3b82f6;" id="btn-unirse-sala" onclick="joinRoomManually()">Opción B: Unirse por Código</button>
+                </div>
+            </div>
+            <div id="created-code-area" style="display: none;">
+                <p style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 5px;">Comparte este código con tu rival:</p>
+                <div id="room-code-output" class="room-code-display">000000</div>
+                <div id="network-status">Iniciando servidor de red...</div>
+            </div>
+        </div>
+
+        <h3 style="margin-bottom: 10px; color: #94a3b8;">2. Elige Dificultad del Mapa:</h3>
+        
+        <div id="solo-levels-panel" class="difficulty-sections">
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                <span id="progression-title" style="color:#94a3b8; font-size:0.9rem; font-weight: bold;">Progresión Solo (1 - 100)</span>
+            </div>
+            <div class="levels-grid-scroll" id="dynamic-levels-grid"></div>
+        </div>
+
+        <div id="bot-levels-panel" class="difficulty-sections" style="display: none;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                <span style="color:#22d3ee; font-size:0.9rem; font-weight: bold;">Niveles Vs BOT (1 - 100) 🤖</span>
+            </div>
+            <div class="levels-grid-scroll" id="bot-levels-grid"></div>
+        </div>
+
+        <div id="online-levels-panel" class="difficulty-sections" style="display: none; text-align: center;">
+            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 15px;">Solo el Anfitrión selecciona la dificultad de la sala antes de crearla.</p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="btn var-diff-btn" style="background: #22c55e;" onclick="setOnlineDifficulty('easy')" id="btn-diff-easy">Fácil</button>
+                <button class="btn var-diff-btn" style="background: #3b82f6; opacity: 0.5;" onclick="setOnlineDifficulty('medium')" id="btn-diff-medium">Medio</button>
+                <button class="btn var-diff-btn" style="background: #ef4444; opacity: 0.5;" onclick="setOnlineDifficulty('hard')" id="btn-diff-hard">Difícil</button>
+            </div>
+            <p id="online-diff-desc" style="color: var(--accent-gold); margin-top: 15px; font-weight: bold;">Dificultad de sala: MEDIO</p>
+        </div>
+
+        <div style="display:flex; gap:10px; width:100%; max-width:700px;">
+            <button class="btn" style="background: #f59e0b; color: black; flex:1;" onclick="openShop()">🏪 Tienda</button>
+            <button class="btn" style="background: #475569; flex:1;" onclick="changeScreen('profile-screen')">⚙️ Perfil</button>
+        </div>
+        <button id="btn-start-game" class="btn" style="margin-top: 15px; max-width: 700px; background: linear-gradient(to right, #4f46e5, #6366f1);" onclick="startGame()">⚔️ Jugar / Iniciar Partida</button>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <div class="scoreboard">
+            <div id="score-p1" class="player-score active-turn" style="border-left: 4px solid var(--player1-color);">
+                <div id="label-p1" style="font-weight:bold;">Tú</div>
+                <div id="count-p1" style="font-size:1.8rem; font-weight:bold;">0</div>
+            </div>
+            <div id="score-p2" class="player-score" style="border-right: 4px solid var(--player2-color);">
+                <div id="label-p2" style="font-weight:bold;">Rival</div>
+                <div id="count-p2" style="font-size:1.8rem; font-weight:bold;">0</div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:10px; text-align:center; font-weight:bold; color:var(--accent-gold);" id="game-timer-display">Tiempo: --</div>
+
+        <div class="game-layout">
+            <div id="board" class="game-board"></div>
+            <div class="powerups-panel" id="pw-panel">
+                <h4 style="font-size:0.75rem; color:#94a3b8; text-align:center; text-transform:uppercase;">Skills</h4>
+                <button class="powerup-btn" id="pw-lince" onclick="usePowerup('lince')">👁️ Lince <span class="powerup-count" id="count-pw-lince">0</span></button>
+                <button class="powerup-btn" id="pw-radar" onclick="usePowerup('radar')">🎯 Radar <span class="powerup-count" id="count-pw-radar">0</span></button>
+                <button class="powerup-btn" id="pw-time" onclick="usePowerup('time')">⏱️ Reloj <span class="powerup-count" id="count-pw-time">0</span></button>
+                <button class="powerup-btn" id="pw-shuffle" onclick="usePowerup('shuffle')">🔄 Mix <span class="powerup-count" id="count-pw-shuffle">0</span></button>
+            </div>
+        </div>
+        <button class="btn" style="margin-top:20px; max-width:200px; background:#ef4444;" onclick="quitGame()">Rendirse 🚪</button>
+    </div>
+
+    <div id="profile-screen" class="screen">
+        <h1>Tu Cuenta</h1>
+        <p class="subtitle">Modifica tus datos o respalda tu progreso</p>
+        
+        <div style="display: flex; gap: 20px; width: 100%; max-width: 850px; flex-wrap: wrap; justify-content: center;">
+            <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 15px;">
+                <div class="input-group">
+                    <label style="color:#94a3b8; font-size:0.9rem;">Nombre de Jugador:</label>
+                    <input type="text" id="username-field" class="input-field" value="GamerPro" onchange="updateProfileName()">
+                </div>
+                
+                <div style="background:#131b2e; padding:15px; border-radius:12px; border:1px solid #1e293b; text-align:center;">
+                    <h4 style="color:var(--accent-gold); margin-bottom:10px;">Gestión de Partida (Respaldo)</h4>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn" style="background:#3b82f6; padding:8px; font-size:0.85rem;" onclick="exportAccount()">📤 Exportar Código</button>
+                        <button class="btn" style="background:#10b981; padding:8px; font-size:0.85rem;" onclick="importAccount()">📥 Importar Código</button>
+                    </div>
+                    <p style="font-size:0.75rem; color:#94a3b8; margin-top:10px;">El autoguardado está activo. Usa esto si cambias de navegador.</p>
+                </div>
+            </div>
+
+            <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 10px; max-height: 50vh; overflow-y: auto; padding-right: 5px;">
+                <div class="profile-customization-box">
+                    <h4 style="color:var(--accent-gold);">Equipar Título:</h4>
+                    <div id="unlocked-titles-list" class="custom-item-grid"></div>
+                </div>
+                <div class="profile-customization-box">
+                    <h4 style="color:var(--accent-gold);">Marco de Avatar:</h4>
+                    <div id="unlocked-frames-list" class="custom-item-grid"></div>
+                </div>
+                <div class="profile-customization-box">
+                    <h4 style="color:var(--accent-gold);">Fondo del Menú:</h4>
+                    <div id="unlocked-backgrounds-list" class="custom-item-grid"></div>
+                </div>
+                <div class="profile-customization-box">
+                    <h4 style="color:var(--accent-gold);">Dorso de Cartas:</h4>
+                    <div id="unlocked-cardbacks-list" class="custom-item-grid"></div>
+                </div>
+                <div class="profile-customization-box">
+                    <h4 style="color:var(--accent-gold);">Efecto/Marco de Carta:</h4>
+                    <div id="unlocked-cardborders-list" class="custom-item-grid"></div>
+                </div>
+                <div class="profile-customization-box">
+                    <h4 style="color:#94a3b8;">Cambiar Foto de Perfil:</h4>
+                    <div id="unlocked-avatars-list" class="custom-item-grid"></div>
+                </div>
+                <div class="profile-customization-box">
+                    <h4 style="color:#94a3b8;">Cambiar Color de Nombre:</h4>
+                    <div id="unlocked-colors-list" class="custom-item-grid"></div>
+                </div>
+            </div>
+        </div>
+        
+        <button class="btn" style="margin-top:20px; max-width:300px;" onclick="backToMenu()">Volver</button>
+    </div>
+
+    <div id="shop-screen" class="screen">
+        <h1>Tienda Arena Mega</h1>
+        <p class="subtitle" style="margin-bottom:15px;">Equípate con ventajas tácticas y estilos visuales exclusivos</p>
+        
+        <div class="shop-navigation">
+            <button class="shop-nav-btn active" id="btn-tab-classic" onclick="switchShopTab('tab-classic')">✨ Clásico</button>
+            <button class="shop-nav-btn" id="btn-tab-titles" onclick="switchShopTab('tab-titles')">🎖️ Títulos Perfil</button>
+            <button class="shop-nav-btn" id="btn-tab-cards" onclick="switchShopTab('tab-cards')">🃏 Estilos de Carta</button>
+            <button class="shop-nav-btn" id="btn-tab-cosmetics" onclick="switchShopTab('tab-cosmetics')">🖼️ Fondos y Marcos</button>
+        </div>
+
+        <div class="shop-container">
+            <div id="tab-classic" class="shop-tab-content active">
+                <div class="shop-section">
+                    <h2>Ventajas (Modo Solo)</h2>
+                    <div class="shop-item">
+                        <div class="shop-item-info"><span>👁️ Ojo de Lince</span><span class="shop-item-desc">Mira todo por 1s</span></div>
+                        <button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-pw-lince" onclick="buyCosmetic('powerup', 'lince', 25, 'buy-pw-lince')">25 🪙</button>
+                    </div>
+                    <div class="shop-item">
+                        <div class="shop-item-info"><span>🎯 Pista de Radar</span><span class="shop-item-desc">Revela la pareja</span></div>
+                        <button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-pw-radar" onclick="buyCosmetic('powerup', 'radar', 35, 'buy-pw-radar')">35 🪙</button>
+                    </div>
+                    <div class="shop-item">
+                        <div class="shop-item-info"><span>⏱️ Reloj de Arena</span><span class="shop-item-desc">+15 segundos extra</span></div>
+                        <button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-pw-time" onclick="buyCosmetic('powerup', 'time', 40, 'buy-pw-time')">40 🪙</button>
+                    </div>
+                    <div class="shop-item">
+                        <div class="shop-item-info"><span>🔄 Mezclador</span><span class="shop-item-desc">Reordena falladas</span></div>
+                        <button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-pw-shuffle" onclick="buyCosmetic('powerup', 'shuffle', 50, 'buy-pw-shuffle')">50 🪙</button>
+                    </div>
+                </div>
+                <div class="shop-section">
+                    <h2>Avatares Legendarios</h2>
+                    <div class="shop-item"><div>🦊 Zorro</div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:70px;" id="buy-av-fox" onclick="buyCosmetic('avatar', '🦊', 30, 'buy-av-fox')">30 🪙</button></div>
+                    <div class="shop-item"><div>🥷 Ninja</div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:70px;" id="buy-av-ninja" onclick="buyCosmetic('avatar', '🥷', 50, 'buy-av-ninja')">50 🪙</button></div>
+                    <div class="shop-item"><div>🐱 Gato</div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:70px;" id="buy-av-cat" onclick="buyCosmetic('avatar', '🐱', 25, 'buy-av-cat')">25 🪙</button></div>
+                    <div class="shop-item"><div>🤖 Cíborg</div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:70px;" id="buy-av-robot" onclick="buyCosmetic('avatar', '🤖', 60, 'buy-av-robot')">60 🪙</button></div>
+                </div>
+                <div class="shop-section">
+                    <h2>Gama de Colores</h2>
+                    <div class="shop-item"><div><span style="color:#22c55e;">■</span> Verde</div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:70px;" id="buy-cl-green" onclick="buyCosmetic('color', '#22c55e', 20, 'buy-cl-green')">20 🪙</button></div>
+                    <div class="shop-item"><div><span style="color:#ec4899;">■</span> Rosa</div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:70px;" id="buy-cl-pink" onclick="buyCosmetic('color', '#ec4899', 40, 'buy-cl-pink')">40 🪙</button></div>
+                    <div class="shop-item"><div><span style="color:#22d3ee;">■</span> Cian</div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:70px;" id="buy-cl-cyan" onclick="buyCosmetic('color', '#22d3ee', 30, 'buy-cl-cyan')">30 🪙</button></div>
+                    <div class="shop-item"><div><span style="color:#f59e0b;">■</span> Oro</div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:70px;" id="buy-cl-gold" onclick="buyCosmetic('color', '#f59e0b', 90, 'buy-cl-gold')">90 🪙</button></div>
+                </div>
+            </div>
+
+            <div id="tab-titles" class="shop-tab-content">
+                <div class="shop-section" style="grid-column: span 2;">
+                    <h2>Títulos de Prestigio Comercializados</h2>
+                    <div class="shop-item"><div>🎖️ Explorador <span class="shop-item-desc">(Básico)</span></div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-ti-expl" onclick="buyCosmetic('title', 'Explorador', 40, 'buy-ti-expl')">40 🪙</button></div>
+                    <div class="shop-item"><div>🎴 Coleccionista <span class="shop-item-desc">(Especialista)</span></div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-ti-col" onclick="buyCosmetic('title', 'Coleccionista', 75, 'buy-ti-col')">75 🪙</button></div>
+                    <div class="shop-item"><div>🧠 Estratega <span class="shop-item-desc">(Mente maestra)</span></div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-ti-est" onclick="buyCosmetic('title', 'Estratega', 150, 'buy-ti-est')">150 🪙</button></div>
+                    <div class="shop-item"><div>👑 Leyenda Viviente <span class="shop-item-desc" style="color:var(--accent-gold);">[Efecto Oro]</span></div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-ti-ley" onclick="buyCosmetic('title', 'Leyenda Viviente', 300, 'buy-ti-ley')">300 🪙</button></div>
+                </div>
+            </div>
+
+            <div id="tab-cards" class="shop-tab-content">
+                <div class="shop-section">
+                    <h2>Dorsos de Cartas</h2>
+                    <div class="shop-item"><div class="shop-item-info"><span>💾 Retro Pixel</span><span class="shop-item-desc">Fondo Estilo Consola</span></div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-db-retro" onclick="buyCosmetic('cardback', 'retro', 80, 'buy-db-retro')">80 🪙</button></div>
+                    <div class="shop-item"><div class="shop-item-info"><span>🌐 Cyberpunk Neón</span><span class="shop-item-desc">Líneas cibernéticas oscuras</span></div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-db-cyber" onclick="buyCosmetic('cardback', 'cyber', 140, 'buy-db-cyber')">140 🪙</button></div>
+                </div>
+                <div class="shop-section">
+                    <h2>Marcos y Hologramas</h2>
+                    <div class="shop-item"><div class="shop-item-info"><span>🔩 Engranaje Steampunk</span><span class="shop-item-desc">Borde mecánico cobrizo</span></div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-cb-steam" onclick="buyCosmetic('cardborder', 'steampunk', 100, 'buy-cb-steam')">100 🪙</button></div>
+                    <div class="shop-item"><div class="shop-item-info"><span>👑 Oro Pulido Brillante</span><span class="shop-item-desc">Glow áureo en bordes</span></div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-cb-gold" onclick="buyCosmetic('cardborder', 'gold', 200, 'buy-cb-gold')">200 🪙</button></div>
+                </div>
+            </div>
+
+            <div id="tab-cosmetics" class="shop-tab-content">
+                <div class="shop-section" style="grid-column: span 2;">
+                    <h2>Fondos de Pantalla General</h2>
+                    <div class="shop-item"><div class="shop-item-info"><span>🌌 Vacío Espacial</span><span class="shop-item-desc">Nebulosas estelares distantes</span></div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-bg-space" onclick="buyCosmetic('background', 'space', 150, 'buy-bg-space')">150 🪙</button></div>
+                    <div class="shop-item"><div class="shop-item-info"><span>🏰 Templo Cyber</span><span class="shop-item-desc">Fondo tecnológico premium</span></div><button class="btn" style="padding:5px 10px; font-size:0.8rem; width:80px;" id="buy-bg-temple" onclick="buyCosmetic('background', 'temple', 250, 'buy-bg-temple')">250 🪙</button></div>
+                </div>
+            </div>
+        </div>
+        
+        <button class="btn" style="margin-top:20px; max-width:300px; background:#475569;" onclick="backToMenu()">Volver al Menú</button>
+    </div>
+
+    <script>
+        // --- VARIABLES DE ESTADO LOCAL ---
+        let playerStats = {
+            username: "GamerPro",
+            title: "Novato",
+            coins: 100,
+            currentLevelSolo: 1,
+            currentLevelBot: 1,
+            unlockedTitles: ["Novato"],
+            unlockedAvatars: ["👤"],
+            unlockedColors: ["#f8fafc"],
+            unlockedCardbacks: ["default"],
+            unlockedCardborders: ["default"],
+            unlockedBackgrounds: ["default"],
+            powerups: { lince: 1, radar: 1, time: 1, shuffle: 1 },
+            equipped: { avatar: "👤", title: "Novato", color: "#f8fafc", cardback: "default", cardborder: "default", background: "default" }
+        };
+
+        let currentGameMode = 'solo';
+        let selectedLevel = 1;
+        let selectedBotLevel = 1;
+        let onlineDifficulty = 'medium';
+        let boardCards = [];
+        let flippedCards = [];
+        let p1Score = 0;
+        let p2Score = 0;
+        let currentTurn = 1; // En Online: 1 = Anfitrión, 2 = Invitado
+        let gameInterval = null;
+        let timeLeft = 0;
+        let lockBoard = false;
+
+        // variables MULTIJUGADOR REAL (PeerJS)
+        let peer = null;
+        let conn = null;
+        let isHost = false;
+        let myOnlineRole = 1; // 1 o 2
+
+        const emojisPool = ["🔥", "⭐", "🍀", "💎", "👑", "👻", "👾", "🦊", "🐯", "🐸", "🚀", "🛸", "🌍", "🍕", "🎮", "🎸", "🃏", "🔮", "🧿", "🎒", "👒", "🎈", "🔑", "📦"];
+
+        window.onload = function() {
+            loadStats();
+            initLevelsGrids();
+            selectMode('solo');
+        };
+
+        function loadStats() {
+            const saved = localStorage.getItem('memory_arena_stats');
+            if (saved) {
+                try { playerStats = JSON.parse(saved); } catch(e) {}
+            }
+            applyCustomizations();
+            renderProfileCustomizations();
+        }
+
+        function saveStats() {
+            localStorage.setItem('memory_arena_stats', JSON.stringify(playerStats));
+        }
+
+        function applyCustomizations() {
+            document.getElementById('hud-avatar-icon').textContent = playerStats.equipped.avatar;
+            document.getElementById('hud-username').textContent = playerStats.username;
+            document.getElementById('hud-username').style.color = playerStats.equipped.color;
+            document.getElementById('hud-usertitle').textContent = playerStats.equipped.title;
+            document.getElementById('global-coins-count').textContent = playerStats.coins;
+
+            const root = document.documentElement;
+            if (playerStats.equipped.background === 'space') {
+                root.style.setProperty('--body-bg-custom', 'radial-gradient(circle, #1e1b4b 0%, #090514 100%)');
+            } else if (playerStats.equipped.background === 'temple') {
+                root.style.setProperty('--body-bg-custom', 'linear-gradient(135deg, #0f172a 0%, #311042 100%)');
+            } else {
+                root.style.setProperty('--body-bg-custom', 'none');
+            }
+
+            if (playerStats.equipped.cardback === 'retro') {
+                root.style.setProperty('--bg-card-back', '#475569');
+                root.style.setProperty('--card-custom-border', '3px dashed #f59e0b');
+            } else if (playerStats.equipped.cardback === 'cyber') {
+                root.style.setProperty('--bg-card-back', '#020617');
+                root.style.setProperty('--card-custom-border', '2px solid #06b6d4');
+            } else {
+                root.style.setProperty('--bg-card-back', '#1e293b');
+                root.style.setProperty('--card-custom-border', '2px solid #334155');
+            }
+
+            if (playerStats.equipped.cardborder === 'steampunk') {
+                root.style.setProperty('--card-front-custom-border', '2px solid #b45309');
+                root.style.setProperty('--card-front-effect', '0 0 8px #b45309');
+            } else if (playerStats.equipped.cardborder === 'gold') {
+                root.style.setProperty('--card-front-custom-border', '2px solid #fbbf24');
+                root.style.setProperty('--card-front-effect', '0 0 12px #fbbf24');
+            } else {
+                root.style.setProperty('--card-front-custom-border', '2px solid #60a5fa');
+                root.style.setProperty('--card-front-effect', 'none');
+            }
+        }
+
+        function initLevelsGrids() {
+            const soloGrid = document.getElementById('dynamic-levels-grid');
+            const botGrid = document.getElementById('bot-levels-grid');
+            soloGrid.innerHTML = '';
+            botGrid.innerHTML = '';
+
+            for (let i = 1; i <= 100; i++) {
+                const btnSolo = document.createElement('button');
+                btnSolo.className = 'btn-level' + (i === selectedLevel ? ' selected-level' : '');
+                btnSolo.textContent = i;
+                btnSolo.onclick = () => { selectedLevel = i; initLevelsGrids(); };
+                soloGrid.appendChild(btnSolo);
+
+                const btnBot = document.createElement('button');
+                btnBot.className = 'btn-level' + (i === selectedBotLevel ? ' selected-level' : '');
+                btnBot.textContent = i;
+                btnBot.onclick = () => { selectedBotLevel = i; initLevelsGrids(); };
+                botGrid.appendChild(btnBot);
+            }
+        }
+
+        function selectMode(mode) {
+            currentGameMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById(`mode-${mode}`).classList.add('selected');
+
+            document.getElementById('solo-levels-panel').style.display = mode === 'solo' ? 'block' : 'none';
+            document.getElementById('bot-levels-panel').style.display = mode === 'bot' ? 'block' : 'none';
+            document.getElementById('online-panel').style.display = mode === 'online' ? 'block' : 'none';
+            document.getElementById('online-levels-panel').style.display = mode === 'online' ? 'block' : 'none';
+            
+            // Ocultar botón de inicio manual si es online, ya que inicia por red automáticamente
+            document.getElementById('btn-start-game').style.display = mode === 'online' ? 'none' : 'block';
+        }
+
+        function changeScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function backToMenu() { changeScreen('menu-screen'); }
+        function openShop() { changeScreen('shop-screen'); }
+
+        function switchShopTab(tabId) {
+            document.querySelectorAll('.shop-nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.shop-tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`btn-${tabId}`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function updateProfileName() {
+            const val = document.getElementById('username-field').value;
+            if (val.trim()) {
+                playerStats.username = val.trim();
+                saveStats();
+                applyCustomizations();
+            }
+        }
+
+        function renderProfileCustomizations() {
+            const lists = {
+                'unlocked-titles-list': { arr: playerStats.unlockedTitles, key: 'title' },
+                'unlocked-avatars-list': { arr: playerStats.unlockedAvatars, key: 'avatar' },
+                'unlocked-backgrounds-list': { arr: playerStats.unlockedBackgrounds, key: 'background' },
+                'unlocked-cardbacks-list': { arr: playerStats.unlockedCardbacks, key: 'cardback' },
+                'unlocked-cardborders-list': { arr: playerStats.unlockedCardborders, key: 'cardborder' },
+                'unlocked-colors-list': { arr: playerStats.unlockedColors, key: 'color', isColor: true }
+            };
+
+            for (let id in lists) {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerHTML = lists[id].arr.map(item => {
+                        const active = playerStats.equipped[lists[id].key] === item ? 'active' : '';
+                        const label = lists[id].isColor ? `<span style="color:${item}">■</span>` : item;
+                        return `<button class="btn-select-custom ${active}" onclick="equipItem('${lists[id].key}', '${item}')">${label}</button>`;
+                    }).join('');
+                }
+            }
+        }
+
+        function equipItem(key, value) {
+            playerStats.equipped[key] = value;
+            saveStats();
+            applyCustomizations();
+            renderProfileCustomizations();
+        }
+
+        function buyCosmetic(type, value, cost, btnId) {
+            if (playerStats.coins < cost) {
+                alert("No tienes suficientes monedas 🪙");
+                return;
+            }
+
+            if (type === 'powerup') {
+                playerStats.powerups[value]++;
+            } else {
+                const targetArr = type === 'avatar' ? playerStats.unlockedAvatars :
+                                  type === 'color' ? playerStats.unlockedColors :
+                                  type === 'title' ? playerStats.unlockedTitles :
+                                  type === 'cardback' ? playerStats.unlockedCardbacks :
+                                  type === 'cardborder' ? playerStats.unlockedCardborders :
+                                  playerStats.unlockedBackgrounds;
+                
+                if (targetArr.includes(value)) {
+                    alert("¡Ya tienes desbloqueado este artículo!");
+                    return;
+                }
+                targetArr.push(value);
+            }
+
+            playerStats.coins -= cost;
+            saveStats();
+            applyCustomizations();
+            renderProfileCustomizations();
+            updatePowerupUI();
+            alert("¡Compra exitosa!");
+        }
+
+        function updatePowerupUI() {
+            for (let pw in playerStats.powerups) {
+                const el = document.getElementById(`count-pw-${pw}`);
+                if (el) el.textContent = playerStats.powerups[pw];
+            }
+        }
+
+        function setOnlineDifficulty(diff) {
+            onlineDifficulty = diff;
+            document.querySelectorAll('.var-diff-btn').forEach(b => b.style.opacity = "0.5");
+            if(diff === 'easy') document.getElementById('btn-diff-easy').style.opacity = "1";
+            if(diff === 'medium') document.getElementById('btn-diff-medium').style.opacity = "1";
+            if(diff === 'hard') document.getElementById('btn-diff-hard').style.opacity = "1";
+            document.getElementById('online-diff-desc').textContent = `Dificultad de sala: ${diff.toUpperCase()}`;
+        }
+
+        // --- LÓGICA MULTIJUGADOR REAL (PEERJS CORREGIDA) ---
+        function generateShortCode() {
+            return String(Math.floor(100000 + Math.random() * 900000));
+        }
+
+        function createOnlineRoom() {
+            document.getElementById('created-code-area').style.display = 'block';
+            const statusEl = document.getElementById('network-status');
+            statusEl.textContent = "Generando código de sala...";
+            
+            const roomCode = generateShortCode();
+            document.getElementById('room-code-output').textContent = roomCode;
+
+            // Se inicializa PeerJS usando el código numérico como ID único
+            if (peer) peer.destroy();
+            
+            peer = new Peer('ma-room-' + roomCode);
+
+            peer.on('open', (id) => {
+                isHost = true;
+                myOnlineRole = 1;
+                statusEl.textContent = "Sala creada con éxito. Esperando que tu rival se conecte...";
+            });
+
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupDataChannel();
+            });
+
+            peer.on('error', (err) => {
+                console.error(err);
+                if(err.type === 'unavailable-id') {
+                    statusEl.textContent = "El código ya está en uso. Reintenta crear otra sala.";
+                } else {
+                    statusEl.textContent = "Error al abrir la red de emparejamiento.";
+                }
+            });
+        }
+
+        function joinRoomManually() {
+            const code = document.getElementById('join-code-input').value.trim();
+            if (code.length !== 6) {
+                alert("Por favor introduce un código válido de 6 dígitos.");
+                return;
+            }
+
+            if (peer) peer.destroy();
+            peer = new Peer(); // ID aleatorio para el cliente invitado
+
+            peer.on('open', (id) => {
+                isHost = false;
+                myOnlineRole = 2;
+                console.log("Conectando con el anfitrión de la sala...");
+                conn = peer.connect('ma-room-' + code);
+                setupDataChannel();
+            });
+
+            peer.on('error', (err) => {
+                console.error(err);
+                alert("No se pudo conectar a la sala. Verifica que el código sea correcto.");
+            });
+        }
+
+        function setupDataChannel() {
+            conn.on('open', () => {
+                if (isHost) {
+                    document.getElementById('network-status').textContent = "¡Rival conectado! Sincronizando partida...";
+                    // El Host decide las cartas y dificultad de juego y las envía al Invitado
+                    let pairsCount = 8; // Medium por defecto
+                    if(onlineDifficulty === 'easy') pairsCount = 6;
+                    if(onlineDifficulty === 'hard') pairsCount = 14;
+
+                    let chosenEmojis = emojisPool.sort(() => Math.random() - 0.5).slice(0, pairsCount);
+                    let finalBoard = [...chosenEmojis, ...chosenEmojis].sort(() => Math.random() - 0.5);
+
+                    setTimeout(() => {
+                        conn.send({
+                            type: 'INIT_GAME',
+                            board: finalBoard,
+                            difficulty: onlineDifficulty,
+                            hostName: playerStats.username
+                        });
+                        startRealOnlineGame(finalBoard, onlineDifficulty, playerStats.username, "Rival");
+                    }, 1000);
+                } else {
+                    console.log("Conexión establecida con éxito con el host.");
+                }
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'INIT_GAME') {
+                    startRealOnlineGame(data.board, data.difficulty, "Rival", playerStats.username);
+                }
+                else if (data.type === 'FLIP_CARD') {
+                    executeOnlineFlip(data.index);
+                }
+                else if (data.type === 'QUIT') {
+                    alert("Tu rival ha abandonado la partida.");
+                    cleanUpNetGame();
+                }
+            });
+
+            conn.on('close', () => {
+                alert("Conexión perdida con el rival.");
+                cleanUpNetGame();
+            });
+        }
+
+        function startRealOnlineGame(syncedBoard, difficulty, nameP1, nameP2) {
+            p1Score = 0;
+            p2Score = 0;
+            currentTurn = 1; // Empieza siempre el Host (P1)
+            flippedCards = [];
+            lockBoard = (myOnlineRole !== currentTurn); // Bloqueado si no es tu turno
+
+            document.getElementById('count-p1').textContent = 0;
+            document.getElementById('count-p2').textContent = 0;
+            document.getElementById('label-p1').textContent = nameP1;
+            document.getElementById('label-p2').textContent = nameP2;
+
+            boardCards = syncedBoard;
+
+            if (gameInterval) clearInterval(gameInterval);
+            let dMultiplier = difficulty === 'easy' ? 4 : difficulty === 'hard' ? 2 : 3;
+            timeLeft = 60 + (boardCards.length) * dMultiplier;
+            document.getElementById('game-timer-display').textContent = `Tiempo: ${timeLeft}s`;
+
+            gameInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('game-timer-display').textContent = `Tiempo: ${timeLeft}s`;
+                if (timeLeft <= 0) {
+                    clearInterval(gameInterval);
+                    alert("¡Fin del tiempo! Partida concluida.");
+                    quitGame();
+                }
+            }, 1000);
+
+            // Renderizar tablero
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            let cols = Math.ceil(Math.sqrt(boardCards.length));
+            board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            if (boardCards.length > 16) board.classList.add('large-board');
+            else board.classList.remove('large-board');
+
+            boardCards.forEach((emoji, idx) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.id = `card-${idx}`;
+                card.innerHTML = `
+                    <div class="card-face card-back"></div>
+                    <div class="card-face card-front">${emoji}</div>
+                `;
+                card.onclick = () => flipCardRealOnline(card, idx);
+                board.appendChild(card);
+            });
+
+            // Ocultar habilidades en online para evitar desincronizaciones locales
+            document.getElementById('pw-panel').style.opacity = "0.2";
+            document.getElementById('pw-panel').style.pointerEvents = "none";
+
+            updateTurnUI();
+            changeScreen('game-screen');
+        }
+
+        function flipCardRealOnline(card, index) {
+            if (lockBoard || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+            
+            // Avisar al rival vía P2P
+            if (conn && conn.open) {
+                conn.send({ type: 'FLIP_CARD', index: index });
+            }
+            executeOnlineFlip(index);
+        }
+
+        function executeOnlineFlip(index) {
+            const card = document.getElementById(`card-${index}`);
+            card.classList.add('flipped');
+            flippedCards.push({ card, index });
+
+            if (flippedCards.length === 2) {
+                checkMatchRealOnline();
+            }
+        }
+
+        function checkMatchRealOnline() {
+            lockBoard = true; 
+            const [first, second] = flippedCards;
+
+            if (boardCards[first.index] === boardCards[second.index]) {
+                // Par idéntico encontrado
+                first.card.classList.add('matched', currentTurn === 1 ? 'by-p1' : 'by-p2');
+                second.card.classList.add('matched', currentTurn === 1 ? 'by-p1' : 'by-p2');
+
+                if (currentTurn === 1) {
+                    p1Score++;
+                    document.getElementById('count-p1').textContent = p1Score;
+                } else {
+                    p2Score++;
+                    document.getElementById('count-p2').textContent = p2Score;
+                }
+
+                flippedCards = [];
+
+                const allMatched = document.querySelectorAll('.card.matched').length === boardCards.length;
+                if (allMatched) {
+                    if (gameInterval) clearInterval(gameInterval);
+                    setTimeout(() => {
+                        let iWon = (myOnlineRole === 1 && p1Score > p2Score) || (myOnlineRole === 2 && p2Score > p1Score);
+                        let tie = (p1Score === p2Score);
+                        if(tie) {
+                            alert("¡Partida terminada en un empate técnico!");
+                        } else if(iWon) {
+                            playerStats.coins += 50;
+                            saveStats();
+                            applyCustomizations();
+                            alert("¡Felicidades, ganaste el duelo Online! Recompensa: +50 🪙");
+                        } else {
+                            alert("Victoria para tu contrincante. ¡Suerte la próxima vez!");
+                        }
+                        cleanUpNetGame();
+                    }, 600);
+                    return;
+                }
+
+                // Si acierta, conserva el turno
+                lockBoard = (myOnlineRole !== currentTurn);
+            } else {
+                // Fallo: Voltear las cartas hacia abajo tras un retraso corto
+                setTimeout(() => {
+                    first.card.classList.remove('flipped');
+                    second.card.classList.remove('flipped');
+                    flippedCards = [];
+
+                    // Alternar el turno
+                    currentTurn = currentTurn === 1 ? 2 : 1;
+                    updateTurnUI();
+                    lockBoard = (myOnlineRole !== currentTurn);
+                }, 1100);
+            }
+        }
+
+        function cleanUpNetGame() {
+            if (gameInterval) clearInterval(gameInterval);
+            if (peer) { peer.destroy(); peer = null; }
+            conn = null;
+            document.getElementById('created-code-area').style.display = 'none';
+            document.getElementById('network-status').textContent = 'Iniciando servidor de red...';
+            backToMenu();
+        }
+
+        // --- LÓGICA DE PARTIDA (INDIVIDUAL / VS BOT ORIGINAL) ---
+        function startGame() {
+            if (currentGameMode === 'online') return;
+
+            p1Score = 0;
+            p2Score = 0;
+            currentTurn = 1;
+            flippedCards = [];
+            lockBoard = false;
+
+            document.getElementById('count-p1').textContent = 0;
+            document.getElementById('count-p2').textContent = 0;
+            document.getElementById('label-p1').textContent = "Tú";
+
+            let level = currentGameMode === 'solo' ? selectedLevel : selectedBotLevel;
+            let pairsCount = 4 + Math.floor(level / 3);
+            if (pairsCount > 24) pairsCount = 24;
+
+            if (currentGameMode === 'solo') {
+                document.getElementById('label-p2').textContent = "Límite";
+                document.getElementById('count-p2').textContent = "N/A";
+            } else if (currentGameMode === 'bot') {
+                document.getElementById('label-p2').textContent = "BOT 🤖";
+            }
+
+            if (gameInterval) clearInterval(gameInterval);
+            if (currentGameMode === 'solo') {
+                document.getElementById('game-timer-display').textContent = "Tiempo: Libre ♾️";
+            } else {
+                timeLeft = 60 + level * 3;
+                document.getElementById('game-timer-display').textContent = `Tiempo: ${timeLeft}s`;
+                gameInterval = setInterval(() => {
+                    timeLeft--;
+                    document.getElementById('game-timer-display').textContent = `Tiempo: ${timeLeft}s`;
+                    if (timeLeft <= 0) {
+                        clearInterval(gameInterval);
+                        alert("¡Se acabó el tiempo! Fin de la partida.");
+                        quitGame();
+                    }
+                }, 1000);
+            }
+
+            let chosenEmojis = emojisPool.sort(() => Math.random() - 0.5).slice(0, pairsCount);
+            boardCards = [...chosenEmojis, ...chosenEmojis].sort(() => Math.random() - 0.5);
+
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            
+            let cols = Math.ceil(Math.sqrt(boardCards.length));
+            board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            if (boardCards.length > 16) board.classList.add('large-board');
+            else board.classList.remove('large-board');
+
+            boardCards.forEach((emoji, idx) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.id = `card-${idx}`;
+                card.innerHTML = `
+                    <div class="card-face card-back"></div>
+                    <div class="card-face card-front">${emoji}</div>
+                `;
+                card.onclick = () => flipCard(card, idx);
+                board.appendChild(card);
+            });
+
+            document.getElementById('pw-panel').style.opacity = "1";
+            document.getElementById('pw-panel').style.pointerEvents = "auto";
+
+            updateTurnUI();
+            updatePowerupUI();
+            changeScreen('game-screen');
+        }
+
+        function flipCard(card, index) {
+            if (lockBoard || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+            if (currentGameMode === 'bot' && currentTurn === 2) return; 
+
+            card.classList.add('flipped');
+            flippedCards.push({ card, index });
+
+            if (flippedCards.length === 2) {
+                checkMatch();
+            }
+        }
+
+        function checkMatch() {
+            lockBoard = true;
+            const [first, second] = flippedCards;
+
+            if (boardCards[first.index] === boardCards[second.index]) {
+                first.card.classList.add('matched', currentTurn === 1 ? 'by-p1' : 'by-p2');
+                second.card.classList.add('matched', currentTurn === 1 ? 'by-p1' : 'by-p2');
+
+                if (currentTurn === 1) {
+                    p1Score++;
+                    document.getElementById('count-p1').textContent = p1Score;
+                } else if (currentGameMode !== 'solo') {
+                    p2Score++;
+                    document.getElementById('count-p2').textContent = p2Score;
+                }
+
+                flippedCards = [];
+
+                const allMatched = document.querySelectorAll('.card.matched').length === boardCards.length;
+                if (allMatched) {
+                    if (gameInterval) clearInterval(gameInterval);
+                    setTimeout(() => {
+                        let reward = (currentGameMode === 'solo' ? selectedLevel : selectedBotLevel) * 5;
+                        playerStats.coins += reward;
+                        saveStats();
+                        applyCustomizations();
+                        alert(`¡Victoria! Has completado el mapa. Recompensa: +${reward} 🪙`);
+                        quitGame();
+                    }, 500);
+                    return;
+                }
+
+                if (currentGameMode === 'bot' && currentTurn === 2) {
+                    setTimeout(() => {
+                        lockBoard = false;
+                        botTurn(); 
+                    }, 1000);
+                } else {
+                    lockBoard = false;
+                }
+            } else {
+                setTimeout(() => {
+                    first.card.removeProperty ? first.card.removeProperty('flipped') : first.card.classList.remove('flipped');
+                    second.card.classList.remove('flipped');
+                    flippedCards = [];
+
+                    if (currentGameMode === 'solo') {
+                        currentTurn = 1;
+                        lockBoard = false;
+                    } else if (currentGameMode === 'bot') {
+                        currentTurn = currentTurn === 1 ? 2 : 1;
+                        updateTurnUI();
+                        lockBoard = false;
+                        if (currentTurn === 2) {
+                            setTimeout(botTurn, 1000);
+                        }
+                    }
+                }, 1000);
+            }
+        }
+
+        function botTurn() {
+            if (currentGameMode !== 'bot' || currentTurn !== 2) return;
+            lockBoard = true;
+
+            const cards = document.querySelectorAll('.card');
+            const available = [];
+            cards.forEach((c, i) => {
+                if (!c.classList.contains('matched') && !c.classList.contains('flipped')) {
+                    available.push(i);
+                }
+            });
+
+            if (available.length < 2) {
+                lockBoard = false;
+                return;
+            }
+
+            let idx1 = available[Math.floor(Math.random() * available.length)];
+            let idx2 = available[Math.floor(Math.random() * available.length)];
+            while (idx1 === idx2) {
+                idx2 = available[Math.floor(Math.random() * available.length)];
+            }
+
+            const card1 = document.getElementById(`card-${idx1}`);
+            card1.classList.add('flipped');
+            flippedCards.push({ card: card1, index: idx1 });
+
+            setTimeout(() => {
+                const card2 = document.getElementById(`card-${idx2}`);
+                card2.classList.add('flipped');
+                flippedCards.push({ card: card2, index: idx2 });
+
+                setTimeout(() => {
+                    checkMatch();
+                }, 500);
+            }, 800);
+        }
+
+        function updateTurnUI() {
+            const p1 = document.getElementById('score-p1');
+            const p2 = document.getElementById('score-p2');
+            if (currentTurn === 1) {
+                p1.classList.add('active-turn');
+                p2.classList.remove('active-turn');
+            } else {
+                p2.classList.add('active-turn');
+                p1.classList.remove('active-turn');
+            }
+        }
+
+        function usePowerup(type) {
+            if (currentGameMode === 'online') return;
+            if (playerStats.powerups[type] <= 0) {
+                alert("No tienes este Powerup en inventario.");
+                return;
+            }
+
+            if (type === 'lince') {
+                playerStats.powerups.lince--;
+                document.querySelectorAll('.card').forEach(c => c.classList.add('flipped'));
+                setTimeout(() => {
+                    document.querySelectorAll('.card').forEach(c => {
+                        if (!c.classList.contains('matched')) c.classList.remove('flipped');
+                    });
+                }, 1200);
+            } else if (type === 'radar') {
+                playerStats.powerups.radar--;
+                const cards = document.querySelectorAll('.card');
+                let found = false;
+                for (let i = 0; i < boardCards.length; i++) {
+                    if (!cards[i].classList.contains('matched')) {
+                        for (let j = i + 1; j < boardCards.length; j++) {
+                            if (boardCards[i] === boardCards[j] && !cards[j].classList.contains('matched')) {
+                                cards[i].classList.add('flipped');
+                                cards[j].classList.add('flipped');
+                                flippedCards = [{ card: cards[i], index: i }, { card: cards[j], index: j }];
+                                setTimeout(checkMatch, 600);
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (found) break;
+                }
+            } else if (type === 'time') {
+                if (currentGameMode === 'solo') {
+                    alert("El tiempo ya es libre en este modo.");
+                    return;
+                }
+                playerStats.powerups.time--;
+                timeLeft += 15;
+                document.getElementById('game-timer-display').textContent = `Tiempo: ${timeLeft}s`;
+            } else if (type === 'shuffle') {
+                playerStats.powerups.shuffle--;
+                const unmatched = [];
+                for (let i = 0; i < boardCards.length; i++) {
+                    const c = document.getElementById(`card-${i}`);
+                    if (!c.classList.contains('matched')) unmatched.push(i);
+                }
+                let values = unmatched.map(i => boardCards[i]).sort(() => Math.random() - 0.5);
+                unmatched.forEach((idx, i) => {
+                    boardCards[idx] = values[i];
+                    document.getElementById(`card-${idx}`).querySelector('.card-front').textContent = values[i];
+                });
+            }
+
+            saveStats();
+            updatePowerupUI();
+        }
+
+        function quitGame() {
+            if (currentGameMode === 'online') {
+                if (conn && conn.open) conn.send({ type: 'QUIT' });
+                cleanUpNetGame();
+            } else {
+                if (gameInterval) clearInterval(gameInterval);
+                backToMenu();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -388,19 +388,20 @@
         let selectedBotLevel = 1;
         let onlineDifficulty = 'medium';
         let boardCards = [];
-        let flippedCards = [];
+        let flippedCards = []; // Guarda índices numéricos en online para sincronización perfecta
         let p1Score = 0;
         let p2Score = 0;
-        let currentTurn = 1; // En Online: 1 = Anfitrión, 2 = Invitado
+        let currentTurn = 1; 
         let gameInterval = null;
         let timeLeft = 0;
         let lockBoard = false;
+        let totalPairsMatchedOnline = 0; // Contador estricto para fin de partida online
 
         // variables MULTIJUGADOR REAL (PeerJS)
         let peer = null;
         let conn = null;
         let isHost = false;
-        let myOnlineRole = 1; // 1 o 2
+        let myOnlineRole = 1; 
 
         const emojisPool = ["🔥", "⭐", "🍀", "💎", "👑", "👻", "👾", "🦊", "🐯", "🐸", "🚀", "🛸", "🌍", "🍕", "🎮", "🎸", "🃏", "🔮", "🧿", "🎒", "👒", "🎈", "🔑", "📦"];
 
@@ -493,7 +494,6 @@
             document.getElementById('online-panel').style.display = mode === 'online' ? 'block' : 'none';
             document.getElementById('online-levels-panel').style.display = mode === 'online' ? 'block' : 'none';
             
-            // Ocultar botón de inicio manual si es online, ya que inicia por red automáticamente
             document.getElementById('btn-start-game').style.display = mode === 'online' ? 'none' : 'block';
         }
 
@@ -597,7 +597,7 @@
             document.getElementById('online-diff-desc').textContent = `Dificultad de sala: ${diff.toUpperCase()}`;
         }
 
-        // --- LÓGICA MULTIJUGADOR REAL (PEERJS CORREGIDA) ---
+        // --- LÓGICA MULTIJUGADOR SINCRONIZADA POR EL HOST ---
         function generateShortCode() {
             return String(Math.floor(100000 + Math.random() * 900000));
         }
@@ -610,9 +610,7 @@
             const roomCode = generateShortCode();
             document.getElementById('room-code-output').textContent = roomCode;
 
-            // Se inicializa PeerJS usando el código numérico como ID único
             if (peer) peer.destroy();
-            
             peer = new Peer('ma-room-' + roomCode);
 
             peer.on('open', (id) => {
@@ -644,7 +642,7 @@
             }
 
             if (peer) peer.destroy();
-            peer = new Peer(); // ID aleatorio para el cliente invitado
+            peer = new Peer(); 
 
             peer.on('open', (id) => {
                 isHost = false;
@@ -664,8 +662,7 @@
             conn.on('open', () => {
                 if (isHost) {
                     document.getElementById('network-status').textContent = "¡Rival conectado! Sincronizando partida...";
-                    // El Host decide las cartas y dificultad de juego y las envía al Invitado
-                    let pairsCount = 8; // Medium por defecto
+                    let pairsCount = 8; 
                     if(onlineDifficulty === 'easy') pairsCount = 6;
                     if(onlineDifficulty === 'hard') pairsCount = 14;
 
@@ -681,8 +678,6 @@
                         });
                         startRealOnlineGame(finalBoard, onlineDifficulty, playerStats.username, "Rival");
                     }, 1000);
-                } else {
-                    console.log("Conexión establecida con éxito con el host.");
                 }
             });
 
@@ -690,8 +685,45 @@
                 if (data.type === 'INIT_GAME') {
                     startRealOnlineGame(data.board, data.difficulty, "Rival", playerStats.username);
                 }
-                else if (data.type === 'FLIP_CARD') {
-                    executeOnlineFlip(data.index);
+                else if (data.type === 'REQUEST_FLIP') {
+                    // El Host recibe la acción y la procesa de forma centralizada
+                    if (isHost) {
+                        processOnlineFlipAction(data.index);
+                    }
+                }
+                else if (data.type === 'BROADCAST_FLIP') {
+                    // Ambos ejecutan la animación visual enviada desde el Host
+                    document.getElementById(`card-${data.index}`).classList.add('flipped');
+                }
+                else if (data.type === 'MATCH_RESULT') {
+                    // Sincronización absoluta de puntuaciones y estados visuales
+                    setTimeout(() => {
+                        const card1 = document.getElementById(`card-${data.idx1}`);
+                        const card2 = document.getElementById(`card-${data.idx2}`);
+                        
+                        if (data.matched) {
+                            card1.classList.add('matched', data.turn === 1 ? 'by-p1' : 'by-p2');
+                            card2.classList.add('matched', data.turn === 1 ? 'by-p1' : 'by-p2');
+                            p1Score = data.p1Score;
+                            p2Score = data.p2Score;
+                            document.getElementById('count-p1').textContent = p1Score;
+                            document.getElementById('count-p2').textContent = p2Score;
+                            totalPairsMatchedOnline++;
+
+                            if (totalPairsMatchedOnline * 2 === boardCards.length) {
+                                handleOnlineGameEnd();
+                            }
+                        } else {
+                            card1.classList.remove('flipped');
+                            card2.classList.remove('flipped');
+                        }
+
+                        currentTurn = data.nextTurn;
+                        updateTurnUI();
+                        
+                        // Desbloquear tablero localmente según el turno sincronizado
+                        lockBoard = (myOnlineRole !== currentTurn);
+                    }, data.matched ? 400 : 1100);
                 }
                 else if (data.type === 'QUIT') {
                     alert("Tu rival ha abandonado la partida.");
@@ -708,9 +740,10 @@
         function startRealOnlineGame(syncedBoard, difficulty, nameP1, nameP2) {
             p1Score = 0;
             p2Score = 0;
-            currentTurn = 1; // Empieza siempre el Host (P1)
+            totalPairsMatchedOnline = 0;
+            currentTurn = 1; 
             flippedCards = [];
-            lockBoard = (myOnlineRole !== currentTurn); // Bloqueado si no es tu turno
+            lockBoard = (myOnlineRole !== currentTurn); 
 
             document.getElementById('count-p1').textContent = 0;
             document.getElementById('count-p2').textContent = 0;
@@ -724,17 +757,17 @@
             timeLeft = 60 + (boardCards.length) * dMultiplier;
             document.getElementById('game-timer-display').textContent = `Tiempo: ${timeLeft}s`;
 
-            gameInterval = setInterval(() => {
-                timeLeft--;
-                document.getElementById('game-timer-display').textContent = `Tiempo: ${timeLeft}s`;
-                if (timeLeft <= 0) {
-                    clearInterval(gameInterval);
-                    alert("¡Fin del tiempo! Partida concluida.");
-                    quitGame();
-                }
-            }, 1000);
+            if (isHost) {
+                gameInterval = setInterval(() => {
+                    timeLeft--;
+                    document.getElementById('game-timer-display').textContent = `Tiempo: ${timeLeft}s`;
+                    if (timeLeft <= 0) {
+                        clearInterval(gameInterval);
+                        quitGame();
+                    }
+                }, 1000);
+            }
 
-            // Renderizar tablero
             const board = document.getElementById('board');
             board.innerHTML = '';
             let cols = Math.ceil(Math.sqrt(boardCards.length));
@@ -750,11 +783,10 @@
                     <div class="card-face card-back"></div>
                     <div class="card-face card-front">${emoji}</div>
                 `;
-                card.onclick = () => flipCardRealOnline(card, idx);
+                card.onclick = () => sendFlipRequestToServer(idx);
                 board.appendChild(card);
             });
 
-            // Ocultar habilidades en online para evitar desincronizaciones locales
             document.getElementById('pw-panel').style.opacity = "0.2";
             document.getElementById('pw-panel').style.pointerEvents = "none";
 
@@ -762,81 +794,105 @@
             changeScreen('game-screen');
         }
 
-        function flipCardRealOnline(card, index) {
-            if (lockBoard || card.classList.contains('flipped') || card.classList.contains('matched')) return;
-            
-            // Avisar al rival vía P2P
-            if (conn && conn.open) {
-                conn.send({ type: 'FLIP_CARD', index: index });
+        function sendFlipRequestToServer(index) {
+            if (lockBoard) return;
+            const card = document.getElementById(`card-${index}`);
+            if (card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+            if (isHost) {
+                processOnlineFlipAction(index);
+            } else {
+                if (conn && conn.open) {
+                    conn.send({ type: 'REQUEST_FLIP', index: index });
+                }
             }
-            executeOnlineFlip(index);
         }
 
-        function executeOnlineFlip(index) {
-            const card = document.getElementById(`card-${index}`);
-            card.classList.add('flipped');
-            flippedCards.push({ card, index });
+        // Proceso del Servidor (Host): Centraliza el cálculo de coincidencias
+        function processOnlineFlipAction(index) {
+            if (flippedCards.length >= 2) return;
+
+            flippedCards.push(index);
+            
+            // Envía la orden de animación visual a ambos clientes
+            conn.send({ type: 'BROADCAST_FLIP', index: index });
+            document.getElementById(`card-${index}`).classList.add('flipped');
 
             if (flippedCards.length === 2) {
-                checkMatchRealOnline();
+                // Bloquear las interacciones temporalmente
+                lockBoard = true;
+                
+                const idx1 = flippedCards[0];
+                const idx2 = flippedCards[1];
+                let matched = (boardCards[idx1] === boardCards[idx2]);
+                let nextTurn = currentTurn;
+
+                if (matched) {
+                    if (currentTurn === 1) p1Score++; else p2Score++;
+                } else {
+                    nextTurn = currentTurn === 1 ? 2 : 1;
+                }
+
+                // Despacha los resultados exactos calculados por el Host
+                const payload = {
+                    type: 'MATCH_RESULT',
+                    idx1: idx1,
+                    idx2: idx2,
+                    matched: matched,
+                    p1Score: p1Score,
+                    p2Score: p2Score,
+                    turn: currentTurn,
+                    nextTurn: nextTurn
+                };
+
+                conn.send(payload);
+                
+                // El host simula su propia recepción de datos de forma idéntica
+                setTimeout(() => {
+                    const card1 = document.getElementById(`card-${idx1}`);
+                    const card2 = document.getElementById(`card-${idx2}`);
+                    
+                    if (matched) {
+                        card1.classList.add('matched', currentTurn === 1 ? 'by-p1' : 'by-p2');
+                        card2.classList.add('matched', currentTurn === 1 ? 'by-p1' : 'by-p2');
+                        document.getElementById('count-p1').textContent = p1Score;
+                        document.getElementById('count-p2').textContent = p2Score;
+                        totalPairsMatchedOnline++;
+                        
+                        if (totalPairsMatchedOnline * 2 === boardCards.length) {
+                            handleOnlineGameEnd();
+                        }
+                    } else {
+                        card1.classList.remove('flipped');
+                        card2.classList.remove('flipped');
+                    }
+
+                    currentTurn = nextTurn;
+                    updateTurnUI();
+                    lockBoard = (myOnlineRole !== currentTurn);
+                }, matched ? 400 : 1100);
+
+                flippedCards = [];
             }
         }
 
-        function checkMatchRealOnline() {
-            lockBoard = true; 
-            const [first, second] = flippedCards;
-
-            if (boardCards[first.index] === boardCards[second.index]) {
-                // Par idéntico encontrado
-                first.card.classList.add('matched', currentTurn === 1 ? 'by-p1' : 'by-p2');
-                second.card.classList.add('matched', currentTurn === 1 ? 'by-p1' : 'by-p2');
-
-                if (currentTurn === 1) {
-                    p1Score++;
-                    document.getElementById('count-p1').textContent = p1Score;
+        function handleOnlineGameEnd() {
+            if (gameInterval) clearInterval(gameInterval);
+            setTimeout(() => {
+                let iWon = (myOnlineRole === 1 && p1Score > p2Score) || (myOnlineRole === 2 && p2Score > p1Score);
+                let tie = (p1Score === p2Score);
+                if(tie) {
+                    alert("¡Partida terminada en un empate técnico!");
+                } else if(iWon) {
+                    playerStats.coins += 50;
+                    saveStats();
+                    applyCustomizations();
+                    alert("¡Felicidades, ganaste el duelo Online! Recompensa: +50 🪙");
                 } else {
-                    p2Score++;
-                    document.getElementById('count-p2').textContent = p2Score;
+                    alert("Victoria para tu contrincante. ¡Suerte la próxima vez!");
                 }
-
-                flippedCards = [];
-
-                const allMatched = document.querySelectorAll('.card.matched').length === boardCards.length;
-                if (allMatched) {
-                    if (gameInterval) clearInterval(gameInterval);
-                    setTimeout(() => {
-                        let iWon = (myOnlineRole === 1 && p1Score > p2Score) || (myOnlineRole === 2 && p2Score > p1Score);
-                        let tie = (p1Score === p2Score);
-                        if(tie) {
-                            alert("¡Partida terminada en un empate técnico!");
-                        } else if(iWon) {
-                            playerStats.coins += 50;
-                            saveStats();
-                            applyCustomizations();
-                            alert("¡Felicidades, ganaste el duelo Online! Recompensa: +50 🪙");
-                        } else {
-                            alert("Victoria para tu contrincante. ¡Suerte la próxima vez!");
-                        }
-                        cleanUpNetGame();
-                    }, 600);
-                    return;
-                }
-
-                // Si acierta, conserva el turno
-                lockBoard = (myOnlineRole !== currentTurn);
-            } else {
-                // Fallo: Voltear las cartas hacia abajo tras un retraso corto
-                setTimeout(() => {
-                    first.card.classList.remove('flipped');
-                    second.card.classList.remove('flipped');
-                    flippedCards = [];
-
-                    // Alternar el turno
-                    currentTurn = currentTurn === 1 ? 2 : 1;
-                    updateTurnUI();
-                    lockBoard = (myOnlineRole !== currentTurn);
-                }, 1100);
-            }
+                cleanUpNetGame();
+            }, 600);
         }
 
         function cleanUpNetGame() {
@@ -975,7 +1031,7 @@
                 }
             } else {
                 setTimeout(() => {
-                    first.card.removeProperty ? first.card.removeProperty('flipped') : first.card.classList.remove('flipped');
+                    first.card.classList.remove('flipped');
                     second.card.classList.remove('flipped');
                     flippedCards = [];
 
